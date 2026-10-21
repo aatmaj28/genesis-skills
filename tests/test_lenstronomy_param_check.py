@@ -325,6 +325,20 @@ class CodeCheckRegressionTests(unittest.TestCase):
         diverged = {d["field"]: d["actual"] for d in comp["diverged"]}
         self.assertEqual(diverged.get("kwargs_lens[0].theta_E"), 2.5)
 
+    def test_grid_size_may_be_passed_by_keyword_in_either_spelling(self) -> None:
+        # lenstronomy 1.9.2 names the arguments numPix/deltaPix, 1.14 num_pix/delta_pix.
+        base = "".join(line + "\n" for line in _program(GOOD).splitlines()
+                       if not line.startswith(("numPix", "deltaPix")))
+        call = ("kwargs_data = data_configure_simple({n}=64, {d}=0.08, "
+                "exposure_time=exposure_time, background_rms=background_rms)\n")
+        for n, d in (("numPix", "deltaPix"), ("num_pix", "delta_pix")):
+            with self.subTest(spelling=n):
+                comp = _compare(base + call.format(n=n, d=d))
+                self.assertTrue(comp["passed"], comp["messages"])
+                self.assertIn("numPix", comp["matched"])
+                wrong = _compare(base + call.format(n=n, d=d).replace("=64", "=128"))
+                self.assertIn("numPix", [x["field"] for x in wrong["diverged"]])
+
 
 class CommandLineTests(unittest.TestCase):
     def _run(self, *args: str, stdin: str | None = None) -> tuple[int, dict]:

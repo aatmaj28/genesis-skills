@@ -19,7 +19,9 @@ Where each field is looked for:
   (``light_model_list`` is accepted for the source too);
 * ``kwargs_lens`` / ``kwargs_source``: assignments to those names;
 * ``numPix`` / ``deltaPix``: the first two arguments of
-  ``data_configure_simple(...)``, falling back to same-named assignments;
+  ``data_configure_simple(...)``, positional or by keyword in either the 1.9.2
+  (``numPix``) or 1.14+ (``num_pix``) spelling, falling back to assignments
+  to either name;
 * ``exposure_time`` / ``background_rms``: keywords of that call, falling back
   to same-named assignments;
 * PSF ``fwhm``: the ``fwhm=`` keyword of a ``PSF(...)`` call.
@@ -45,6 +47,9 @@ from typing import Any
 UNRESOLVED = "<unresolved>"
 
 _REL_TOL = 1e-6
+
+# data_configure_simple's grid arguments: lenstronomy 1.9.2 spelling, 1.14+ spelling.
+_GRID_ALIASES = (("numPix", "num_pix"), ("deltaPix", "delta_pix"))
 
 
 class _Extracted:
@@ -169,9 +174,11 @@ def extract_lenstronomy_inputs(code: str) -> _Extracted:
             if "light_model_list" in kw and found.source_model_list is None:
                 found.source_model_list = _resolve(kw["light_model_list"], symbols)
             if cname == "data_configure_simple":
-                if len(node.args) >= 2:
-                    found.numPix = _resolve(node.args[0], symbols)
-                    found.deltaPix = _resolve(node.args[1], symbols)
+                # Positional, or by keyword in 1.9.2 (numPix) or 1.14+ (num_pix) spelling.
+                for i, (attr, snake) in enumerate(_GRID_ALIASES):
+                    arg = node.args[i] if len(node.args) > i else kw.get(attr, kw.get(snake))
+                    if arg is not None:
+                        setattr(found, attr, _resolve(arg, symbols))
                 if "exposure_time" in kw:
                     found.exposure_time = _resolve(kw["exposure_time"], symbols)
                 if "background_rms" in kw:
@@ -180,9 +187,12 @@ def extract_lenstronomy_inputs(code: str) -> _Extracted:
                 found.psf_fwhm = _resolve(kw["fwhm"], symbols)
 
     # Fallbacks to plain assignments for the data block.
-    for attr in ("numPix", "deltaPix", "exposure_time", "background_rms"):
-        if getattr(found, attr) is None and attr in symbols:
-            setattr(found, attr, symbols[attr])
+    for attr, alias in (*_GRID_ALIASES, ("exposure_time", None), ("background_rms", None)):
+        if getattr(found, attr) is None:
+            if attr in symbols:
+                setattr(found, attr, symbols[attr])
+            elif alias in symbols:
+                setattr(found, attr, symbols[alias])
     return found
 
 
