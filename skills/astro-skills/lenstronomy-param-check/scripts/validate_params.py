@@ -326,15 +326,16 @@ def validate_parameters(params: dict[str, Any], ranges: Ranges) -> dict[str, Any
                 ok(f"{label}_profile_{i}_keys")
 
     # --- Einstein radius ----------------------------------------------------
-    thetas = [kw["theta_E"] for kw in params["kwargs_lens"] if "theta_E" in kw]
-    if thetas:
-        t = thetas[0]
+    for i, kw in enumerate(params["kwargs_lens"]):
+        if "theta_E" not in kw:
+            continue
+        t = kw["theta_E"]
         if r.theta_e_min <= t <= r.theta_e_max:
             ok("einstein_radius")
         else:
             fail("einstein_radius",
-                 f"theta_E={t} arcsec outside [{r.theta_e_min}, {r.theta_e_max}];"
-                 f"{hint('theta_e') or ' check the units are arcsec.'}")
+                 f"kwargs_lens[{i}] theta_E={t} arcsec outside [{r.theta_e_min}, "
+                 f"{r.theta_e_max}];{hint('theta_e') or ' check the units are arcsec.'}")
 
     # --- ellipticity (lens + source e1/e2) ----------------------------------
     all_kwargs = params["kwargs_lens"] + params["kwargs_source"]

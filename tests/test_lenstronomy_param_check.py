@@ -192,6 +192,17 @@ class ValidatorRegressionTests(unittest.TestCase):
                     self.assertFalse(res["passed"])
                     self.assertTrue(any(key in m for m in res["messages"]))
 
+    def test_every_lens_profile_einstein_radius_is_checked(self) -> None:
+        good = GOOD["kwargs_lens"][0]
+        params = _good(lens_model_list=["SIE", "SIE"],
+                       kwargs_lens=[dict(good), dict(good, theta_E=500.0)])
+        for preset in ("general", "deeplense"):
+            res = _validate(params, preset)
+            with self.subTest(preset=preset):
+                self.assertFalse(res["checks"]["einstein_radius"])
+                self.assertTrue(any("kwargs_lens[1]" in m and "theta_E=500.0" in m
+                                    for m in res["messages"]))
+
 
 class LoadParamsTests(unittest.TestCase):
     def test_snake_case_grid_keys_are_accepted(self) -> None:
