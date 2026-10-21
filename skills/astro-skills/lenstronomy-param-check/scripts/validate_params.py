@@ -278,7 +278,8 @@ def validate_parameters(params: dict[str, Any], ranges: Ranges) -> dict[str, Any
         messages.append(msg)
 
     def ok(name: str) -> None:
-        checks[name] = True
+        # A check can run once per profile; one failure must stick.
+        checks.setdefault(name, True)
 
     # --- redshifts ---------------------------------------------------------
     z_lens, z_source = params["z_lens"], params["z_source"]

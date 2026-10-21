@@ -177,6 +177,22 @@ class ValidatorTests(unittest.TestCase):
             V._apply_overrides(V.PRESETS["general"], ["no_such_bound=1"])
 
 
+class ValidatorRegressionTests(unittest.TestCase):
+    def test_a_later_pass_does_not_hide_an_earlier_failure(self) -> None:
+        # DeepLense-AI-Scientist issue #10: with two Sersic sources, a bad
+        # n_sersic or R_sersic followed by a good profile used to pass.
+        good = GOOD["kwargs_source"][0]
+        for key, bad_value in (("n_sersic", 12.0), ("R_sersic", -0.5)):
+            bad = dict(good, **{key: bad_value})
+            for profiles in ([bad, good], [good, bad]):
+                params = _good(source_model_list=["SERSIC_ELLIPSE"] * 2,
+                               kwargs_source=copy.deepcopy(profiles))
+                res = _validate(params)
+                with self.subTest(key=key, bad_first=profiles[0] is bad):
+                    self.assertFalse(res["passed"])
+                    self.assertTrue(any(key in m for m in res["messages"]))
+
+
 class LoadParamsTests(unittest.TestCase):
     def test_snake_case_grid_keys_are_accepted(self) -> None:
         params = _good(kwargs_data={"num_pix": 64, "delta_pix": 0.08})
