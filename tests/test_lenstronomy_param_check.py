@@ -203,6 +203,25 @@ class ValidatorRegressionTests(unittest.TestCase):
                 self.assertTrue(any("kwargs_lens[1]" in m and "theta_E=500.0" in m
                                     for m in res["messages"]))
 
+    def test_missing_required_profile_keys_fail(self) -> None:
+        no_theta = _good()
+        del no_theta["kwargs_lens"][0]["theta_E"]
+        res = _validate(no_theta, "general")
+        self.assertFalse(res["checks"]["lens_profile_0_keys"])
+        self.assertTrue(any("missing required key(s) ['theta_E']" in m for m in res["messages"]))
+
+        no_gamma2 = _good(lens_model_list=["SIE", "SHEAR"],
+                          kwargs_lens=[GOOD["kwargs_lens"][0], {"gamma1": 0.02}])
+        res = _validate(no_gamma2, "general")
+        self.assertFalse(res["checks"]["lens_profile_1_keys"])
+
+        # Centres default to 0 in lenstronomy, so leaving them out is fine.
+        centred = _good()
+        for kw in centred["kwargs_lens"] + centred["kwargs_source"]:
+            del kw["center_x"], kw["center_y"]
+        res = _validate(centred, "general")
+        self.assertTrue(res["passed"], res["messages"])
+
 
 class LoadParamsTests(unittest.TestCase):
     def test_snake_case_grid_keys_are_accepted(self) -> None:

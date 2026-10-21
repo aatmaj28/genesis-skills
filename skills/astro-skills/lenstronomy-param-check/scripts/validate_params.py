@@ -42,6 +42,19 @@ PROFILE_PARAMS: dict[str, tuple[str, ...]] = {
     "GAUSSIAN": ("amp", "sigma", "center_x", "center_y"),
 }
 
+# The arguments each profile's ``function`` takes without a default, from the
+# same introspection; the remaining names (centres, shear origin) default to 0.
+REQUIRED_PARAMS: dict[str, tuple[str, ...]] = {
+    "SIE": ("theta_E", "e1", "e2"),
+    "SIS": ("theta_E",),
+    "EPL": ("theta_E", "gamma", "e1", "e2"),
+    "SHEAR": ("gamma1", "gamma2"),
+    "NFW": ("Rs", "alpha_Rs"),
+    "SERSIC": ("amp", "R_sersic", "n_sersic"),
+    "SERSIC_ELLIPSE": ("amp", "R_sersic", "n_sersic", "e1", "e2"),
+    "GAUSSIAN": ("amp", "sigma"),
+}
+
 
 @dataclass
 class Ranges:
@@ -322,8 +335,13 @@ def validate_parameters(params: dict[str, Any], ranges: Ranges) -> dict[str, Any
                      f"{name} kwargs contain unknown key(s) {unknown_keys}; lenstronomy "
                      f"accepts exactly {list(known)}. Check for names from another version "
                      "or another profile.")
-            else:
-                ok(f"{label}_profile_{i}_keys")
+            missing_keys = [k for k in REQUIRED_PARAMS[name] if k not in kw]
+            if missing_keys:
+                fail(f"{label}_profile_{i}_keys",
+                     f"{name} kwargs are missing required key(s) {missing_keys}; "
+                     f"lenstronomy needs {list(REQUIRED_PARAMS[name])} and defaults the "
+                     "rest to 0.")
+            ok(f"{label}_profile_{i}_keys")
 
     # --- Einstein radius ----------------------------------------------------
     for i, kw in enumerate(params["kwargs_lens"]):
