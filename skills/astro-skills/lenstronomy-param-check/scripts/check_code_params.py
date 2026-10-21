@@ -128,13 +128,23 @@ def _call_name(call: ast.Call) -> str:
     return ""
 
 
+def _in_source_order(tree: ast.AST):
+    """Yield every node depth-first in source order (``ast.walk`` is breadth-first)."""
+    stack = [tree]
+    while stack:
+        node = stack.pop()
+        yield node
+        stack.extend(reversed(list(ast.iter_child_nodes(node))))
+
+
 def extract_lenstronomy_inputs(code: str) -> _Extracted:
     """Walk the script and recover the lenstronomy input values."""
     tree = ast.parse(code)
     symbols: dict[str, Any] = {}
     found = _Extracted()
 
-    for node in ast.walk(tree):
+    # Source order matters: a later assignment must replace an earlier one.
+    for node in _in_source_order(tree):
         # Symbol table from simple single-target assignments.
         if isinstance(node, ast.Assign) and len(node.targets) == 1 and isinstance(
             node.targets[0], ast.Name

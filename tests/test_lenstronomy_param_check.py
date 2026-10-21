@@ -310,6 +310,22 @@ class CodeCheckTests(unittest.TestCase):
         self.assertEqual(comp["missing"], ["<script>"])
 
 
+class CodeCheckRegressionTests(unittest.TestCase):
+    def test_assignments_are_read_in_source_order(self) -> None:
+        # ast.walk is breadth-first, so a correct kwargs_lens nested in a block
+        # used to win over a later, wrong top-level reassignment.
+        wrong = copy.deepcopy(GOOD["kwargs_lens"])
+        wrong[0]["theta_E"] = 2.5
+        program = _program(GOOD).replace(
+            f"kwargs_lens = {GOOD['kwargs_lens']!r}\n",
+            f"if True:\n    kwargs_lens = {GOOD['kwargs_lens']!r}\nkwargs_lens = {wrong!r}\n",
+        )
+        comp = _compare(program)
+        self.assertFalse(comp["passed"])
+        diverged = {d["field"]: d["actual"] for d in comp["diverged"]}
+        self.assertEqual(diverged.get("kwargs_lens[0].theta_E"), 2.5)
+
+
 class CommandLineTests(unittest.TestCase):
     def _run(self, *args: str, stdin: str | None = None) -> tuple[int, dict]:
         completed = subprocess.run(
