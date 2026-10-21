@@ -17,7 +17,9 @@ Where each field is looked for:
 * ``lens_model_list`` / ``source_model_list``: a ``lens_model_list=`` /
   ``light_model_list=`` call keyword, or an assignment to that name
   (``light_model_list`` is accepted for the source too);
-* ``kwargs_lens`` / ``kwargs_source``: assignments to those names;
+* ``kwargs_lens`` / ``kwargs_source``: the arguments of the last
+  ``ImageModel.image(...)`` call, positional or by keyword, since that is what
+  is rendered; without such a call, assignments to those names;
 * ``numPix`` / ``deltaPix``: the first two arguments of
   ``data_configure_simple(...)``, positional or by keyword in either the 1.9.2
   (``numPix``) or 1.14+ (``num_pix``) spelling, falling back to assignments
@@ -147,6 +149,7 @@ def extract_lenstronomy_inputs(code: str) -> _Extracted:
     tree = ast.parse(code)
     symbols: dict[str, Any] = {}
     found = _Extracted()
+    rendered: dict[str, Any] = {}
 
     # Source order matters: a later assignment must replace an earlier one.
     for node in _in_source_order(tree):
@@ -185,6 +188,17 @@ def extract_lenstronomy_inputs(code: str) -> _Extracted:
                     found.background_rms = _resolve(kw["background_rms"], symbols)
             if cname == "PSF" and "fwhm" in kw:
                 found.psf_fwhm = _resolve(kw["fwhm"], symbols)
+            # ImageModel.image(kwargs_lens, kwargs_source, ...): what is rendered.
+            if (cname == "image" and isinstance(node.func, ast.Attribute)
+                    and (len(node.args) >= 2 or {"kwargs_lens", "kwargs_source"} & set(kw))):
+                for i, attr in enumerate(("kwargs_lens", "kwargs_source")):
+                    arg = node.args[i] if len(node.args) > i else kw.get(attr)
+                    if arg is not None:
+                        rendered[attr] = _resolve(arg, symbols)
+
+    # The arguments of the last image() call outrank same-named assignments.
+    for attr, value in rendered.items():
+        setattr(found, attr, value)
 
     # Fallbacks to plain assignments for the data block.
     for attr, alias in (*_GRID_ALIASES, ("exposure_time", None), ("background_rms", None)):

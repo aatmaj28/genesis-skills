@@ -339,6 +339,23 @@ class CodeCheckRegressionTests(unittest.TestCase):
                 wrong = _compare(base + call.format(n=n, d=d).replace("=64", "=128"))
                 self.assertIn("numPix", [x["field"] for x in wrong["diverged"]])
 
+    def test_the_kwargs_passed_to_image_are_the_ones_checked(self) -> None:
+        # A correct kwargs_lens that is defined but not rendered must not pass.
+        wrong = copy.deepcopy(GOOD["kwargs_lens"])
+        wrong[0]["theta_E"] = 2.5
+        base = _program(GOOD) + f"kwargs_lens_render = {wrong!r}\n"
+        for call in ("image_model.image(kwargs_lens=kwargs_lens_render, kwargs_source=kwargs_source)",
+                     "image_model.image(kwargs_lens_render, kwargs_source)"):
+            with self.subTest(call=call):
+                comp = _compare(base + f"image = {call}\n")
+                self.assertFalse(comp["passed"])
+                diverged = {d["field"]: d["actual"] for d in comp["diverged"]}
+                self.assertEqual(diverged.get("kwargs_lens[0].theta_E"), 2.5)
+
+        comp = _compare(_program(GOOD) + "image = image_model.image(kwargs_lens=make_lens(), "
+                        "kwargs_source=kwargs_source)\n")
+        self.assertIn("kwargs_lens", comp["unresolved"])
+
 
 class CommandLineTests(unittest.TestCase):
     def _run(self, *args: str, stdin: str | None = None) -> tuple[int, dict]:
